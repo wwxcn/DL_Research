@@ -76,7 +76,22 @@ class DecoderLayer(nn.Module):
         
         return x
 
+'''
+softmax 是在 generate 方法里做的 ，而不是在 forward 里。为什么这样设计？
+训练流程：
+  logits = model(x)           # [batch, seq, vocab]
+  loss = CrossEntropyLoss(logits.view(-1, vocab), labels.view(-1))
+  # CrossEntropyLoss 内部: log_softmax → negative log likelihood
+生成流程：
+  logits = model(x)           # [batch, seq, vocab]
+  probs = softmax(logits)     # 转成概率
+  token = sample(probs)       # 采样
 
+分离的好处：
+1. forward 保持简洁，返回原始logits
+2. 训练时直接用logits算loss，避免多余的softmax计算
+3. 生成时根据需要选择采样策略（greedy、top-k、top-p等）
+'''
 class DecoderOnlyTransformer(nn.Module):
     def __init__(self, vocab_size: int, d_model: int, num_heads: int, num_layers: int, d_ff: int, max_seq_len: int, dropout: float = 0.1):
         super().__init__()
@@ -103,10 +118,79 @@ class DecoderOnlyTransformer(nn.Module):
         for layer in self.layers:
             x = layer(x, mask)
         
-        x = self.fc(x)
+        x = self.fc(x) # [batch_size, sequence_length, vocab_size]
         return x
 
+    def generate_subsequent_mask(seq_len: int) -> torch.Tensor:
+        mask = torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool))
+        return mask.unsqueeze(0).unsqueeze(0)
 
-def generate_subsequent_mask(seq_len: int) -> torch.Tensor:
-    mask = torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool))
-    return mask.unsqueeze(0).unsqueeze(0)
+    @torch.no_grad()
+    def generate(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 50,
+        temperature: float = 1.0,
+        top_k: int = None,
+        eos_token_id: int = None
+    ) -> torch.Tensor:
+        """
+        自回归生成：- 从起始token（如 <bos> ）开始，每次预测下一个token，
+                  - 将预测结果拼接到输入，继续预测，直到遇到结束token（如 <eos> ）或达到最大长度
+
+        Args:
+            input_ids: [batch_size, seq_len] 起始token序列
+            max_new_tokens: 最多生成多少个新token
+            temperature: 采样温度，控制随机性（>1增加随机性，<1减少随机性）
+            top_k: 只从概率最高的k个token中采样
+            eos_token_id: 结束token的id，遇到则停止
+
+        Returns:
+            [batch_size, seq_len + generated_len] 生成的完整token序列
+
+        关键概念：
+            logits: 模型的原始输出，未经过softmax的原始分数
+                    表示每个token的“原始可能性”，值越大表示越可能
+        重点解释：
+            - 训练时，输入: ["我", "爱", "你"]，对应的标签: ["爱", "你", "！"]，即输出结果是下一个token的预测
+            - 因此，推理时，每个位置的输出实际上是在预测该位置之后的下一个 token
+        """
+        self.eval()  # 切换到评估模式
+        batch_size = input_ids.size(0)
+
+        for _ in range(max_new_tokens):
+            # 1. 获取当前序列长度，生成因果mask（确保只能看到已生成的token）
+            seq_len = input_ids.size(1)
+            mask = self.generate_subsequent_mask(seq_len).to(input_ids.device)
+
+            # 2. 前向传播获取logits（原始输出分数）
+            logits = self.forward(input_ids, mask)  # [batch, seq_len, vocab_size]
+            
+            # 3. 只取最后一个位置的logits（预测下一个token）
+            next_token_logits = logits[:, -1, :]  # [batch, vocab_size]
+            
+            # 4. 应用温度参数调整分布（控制随机性）
+            next_token_logits = next_token_logits / temperature
+
+            # 5. 可选：应用top-k采样（只考虑概率最高的k个token）
+            if top_k is not None:
+                v, _ = torch.topk(next_token_logits, top_k)  # 获取前k个最大值
+                # 将低于第k个值的logits设为负无穷（排除在外）
+                next_token_logits[next_token_logits < v[:, [-1]]] = -float('inf')
+
+            # 6. 将logits转换为概率分布
+            probs = F.softmax(next_token_logits, dim=-1)  # [batch, vocab_size]
+            
+            # 7. 按概率采样下一个token
+            # torch.multinomial按概率分布进行采样,torch.argmax按最大值采样
+            next_token = torch.multinomial(probs, num_samples=1)  # [batch, 1]
+
+            # 8. 将新token拼接到序列末尾
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+
+            # 9. 检查是否生成了结束token
+            if eos_token_id is not None and (next_token == eos_token_id).all():
+                break
+
+        return input_ids
+
