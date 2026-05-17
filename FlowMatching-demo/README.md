@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-本项目实现了一个经典的 Flow Matching 生成模型，使用 DiT (Diffusion Transformer) 作为向量场估计网络。通过学习从噪声分布到数据分布的直线路径，实现高效的样本生成。
+本项目实现了一个经典的 Flow Matching 生成模型，使用 DiT (Diffusion Transformer) 作为向量场估计网络。通过学习从噪声分布到数据分布的直线路径，实现高效的样本生成。项目包含完整的实现、演示代码和用户实现文件。
 
 ## 核心组件
 
@@ -136,3 +136,13 @@ FlowMatching-demo/
 ├── flow_matching_dit+class+main_wwx.py   # 用户实现的文件，包含上面三个文件的功能，面试时使用
 └── README.md                 # 本文档
 ```
+
+## 文件说明
+
+### 主要实现文件
+
+| 文件 | 用途 |
+|------|------|
+| `dit_model.py` | 完整的 DiT (Diffusion Transformer) 模型实现，可用于任何需要条件生成的场景 |
+| `flow_matching.py` | Flow Matching 的训练、损失计算和采样逻辑，是一个通用的包装器 |
+| `flow_matching_demo.py` | 使用 DiT 和 Flow Matching 在 2D 数据集上的完整演示 |
