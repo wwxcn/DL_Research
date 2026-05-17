@@ -10,9 +10,9 @@
 
 | 文件 | 功能描述 |
 |------|---------|
-| `dit_model.py` | DiT 模型实现，包含多头注意力、MLP、Transformer 块 |
-| `flow_matching.py` | Flow Matching 核心逻辑：损失计算、训练、采样 |
-| `flow_matching_demo.py` | 主程序：数据集创建、模型训练、样本生成演示 |
+| `flow_matching_dit_model.py` | DiT 模型实现，包含多头注意力、MLP、Transformer 块 |
+| `flow_matching_class.py` | Flow Matching 核心逻辑：损失计算、训练、采样 |
+| `flow_matching_main.py` | 主程序：数据集创建、模型训练、样本生成演示 |
 
 ## 模型架构
 
@@ -76,14 +76,14 @@ pip install torch numpy matplotlib scikit-learn
 ### 运行演示
 
 ```bash
-python flow_matching_demo.py
+python flow_matching_main.py
 ```
 
 ### 基本用法
 
 ```python
-from dit_model import DiT
-from flow_matching import FlowMatching
+from flow_matching_dit_model import DiT
+from flow_matching_class import FlowMatching
 from torch.utils.data import DataLoader, TensorDataset
 import torch
 
@@ -130,9 +130,9 @@ samples = flow_matching.sample(batch_size=1000, num_steps=100)
 
 ```
 FlowMatching-demo/
-├── dit_model.py              # DiT 模型实现
-├── flow_matching.py          # Flow Matching 核心逻辑
-├── flow_matching_demo.py     # 主程序演示
-├── flowmatching.py           # 用户原始文件（保留）
+├── flow_matching_dit_model.py            # DiT 模型实现
+├── flow_matching_class.py          # Flow Matching 核心逻辑
+├── flow_matching_main.py     # 主程序演示
+├── flow_matching_dit+class+main_wwx.py   # 用户实现的文件，包含上面三个文件的功能，面试时使用
 └── README.md                 # 本文档
 ```

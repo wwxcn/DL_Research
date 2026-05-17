@@ -7,8 +7,8 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
 import matplotlib.pyplot as plt
-from dit_model import DiT
-from flow_matching import FlowMatching
+from flow_matching_dit_model import DiT
+from flow_matching_class import FlowMatching
 import os
 
 

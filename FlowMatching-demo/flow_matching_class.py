@@ -16,7 +16,6 @@ class FlowMatching:
     def __init__(self, model, device='cuda'):
         self.model = model.to(device)
         self.device = device
-        self.optimizer = None
 
     def compute_loss(self, x0, x1):
         """
@@ -96,8 +95,7 @@ class FlowMatching:
         训练模型
         """
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr, weight_decay=0.01)
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=num_epochs)
-
+        self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=num_epochs)
         losses = []
 
         for epoch in range(num_epochs):
@@ -108,7 +106,7 @@ class FlowMatching:
                 loss = self.train_step(x1)
                 epoch_losses.append(loss)
 
-            scheduler.step()
+            self.scheduler.step()
 
             avg_loss = np.mean(epoch_losses)
             losses.append(avg_loss)
